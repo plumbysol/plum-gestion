@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="pantalla-cargando" class="center-screen">
+  <p class="mono" style="color:var(--ink-soft)">Cargando catálogo…</p>
+</div>
+
+<div id="pantalla-error" class="center-screen hidden">
+  <div class="auth-card" style="text-align:center">
+    <div class="brand" style="justify-content:center"><div class="brand-mark"></div><span class="brand-name">Plum Gestión</span></div>
+    <p style="color:var(--ink-soft);margin-top:10px" id="mensaje-error">No encontramos este catálogo.</p>
+  </div>
+</div>
+
+<div id="catalogo" class="catalog-body hidden">
+  <div class="catalog-head">
+    <div class="brand-mark"></div>
+    <h1 id="cat-nombre-negocio"></h1>
+    <p>Catálogo de productos</p>
+  </div>
+  <div class="tag-grid" id="cat-grid"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/catalogo.js"></script>
+</body>
+</html>
