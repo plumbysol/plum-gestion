@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plum Gestión — Panel</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="pantalla-cargando" class="center-screen">
+  <p class="mono" style="color:var(--ink-soft)">Cargando…</p>
+</div>
+
+<div id="pantalla-config" class="center-screen hidden">
+  <div class="auth-card">
+    <div class="brand"><div class="brand-mark"></div><span class="brand-name">Plum Gestión</span></div>
+    <div class="setup-warning">
+      <strong>Falta conectar la base de datos.</strong><br><br>
+      Abrí el archivo <code>js/config.js</code> y pegá tu <code>SUPABASE_URL</code> y tu <code>SUPABASE_ANON_KEY</code>
+      (los sacás gratis en supabase.com → tu proyecto → Settings → API).
+      Después volvé a subir el archivo y recargá esta página.
+    </div>
+  </div>
+</div>
+
+<div id="pantalla-auth" class="center-screen hidden">
+  <div class="auth-card">
+    <div class="brand"><div class="brand-mark"></div><span class="brand-name">Plum Gestión</span></div>
+    <p class="sub" id="auth-sub">Iniciá sesión para entrar a tu taller</p>
+
+    <div id="auth-error" class="error-box hidden"></div>
+
+    <form id="form-login">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login-email" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="login-password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary">Iniciar sesión</button>
+    </form>
+
+    <form id="form-registro" class="hidden">
+      <div class="field">
+        <label>Nombre del negocio</label>
+        <input type="text" id="reg-negocio" required placeholder="Ej: Cerámica Luna">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="reg-email" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="reg-password" required minlength="6" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-primary">Crear cuenta</button>
+    </form>
+
+    <div class="switch-row">
+      <span id="auth-switch-text">¿No tenés cuenta?</span>
+      <button type="button" id="btn-auth-switch" class="btn btn-ghost">Creá una gratis</button>
+    </div>
+  </div>
+</div>
+
+<div id="app-shell" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark"></div><span class="brand-name">Plum</span></div>
+    <nav>
+      <button class="nav-item active" data-page="insumos">Insumos</button>
+      <button class="nav-item" data-page="productos">Productos</button>
+      <button class="nav-item" data-page="pedidos">Pedidos</button>
+      <button class="nav-item" data-page="tienda">Mi tienda</button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="email" id="user-email-label"></div>
+      <button id="btn-logout" class="btn btn-outline btn-sm" style="width:100%">Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <section id="page-insumos" class="page">
+      <div class="page-head">
+        <div><h2>Insumos</h2><p>La materia prima que usás para producir</p></div>
+        <button class="btn btn-primary" id="btn-nuevo-insumo">+ Nuevo insumo</button>
+      </div>
+      <div class="panel">
+        <table id="tabla-insumos">
+          <thead><tr><th>Nombre</th><th>Unidad</th><th>Costo unitario</th><th>Stock</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="insumos-vacio" class="empty-state hidden">
+          <div class="display">Todavía no cargaste insumos</div>
+          <p>Agregá tu primer insumo para empezar a calcular costos.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-productos" class="page hidden">
+      <div class="page-head">
+        <div><h2>Productos</h2><p>Tu catálogo, con costo y precio de venta</p></div>
+        <button class="btn btn-primary" id="btn-nuevo-producto">+ Nuevo producto</button>
+      </div>
+      <div class="panel">
+        <table id="tabla-productos">
+          <thead><tr><th>Producto</th><th>Costo</th><th>Precio</th><th>Ganancia</th><th>Público</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="productos-vacio" class="empty-state hidden">
+          <div class="display">Todavía no cargaste productos</div>
+          <p>Creá un producto y marcalo como público para que aparezca en tu catálogo.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-pedidos" class="page hidden">
+      <div class="page-head">
+        <div><h2>Pedidos</h2><p>Seguimiento de pedidos de tus clientes</p></div>
+        <button class="btn btn-primary" id="btn-nuevo-pedido">+ Nuevo pedido</button>
+      </div>
+      <div class="panel">
+        <table id="tabla-pedidos">
+          <thead><tr><th>Cliente</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="pedidos-vacio" class="empty-state hidden">
+          <div class="display">Todavía no hay pedidos</div>
+          <p>Cuando cargues un pedido, vas a poder seguir su estado acá.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-tienda" class="page hidden">
+      <div class="page-head">
+        <div><h2>Mi tienda</h2><p>Así te ven tus clientes en el catálogo público</p></div>
+      </div>
+      <div class="panel panel-pad">
+        <div class="field">
+          <label>Nombre del negocio</label>
+          <input type="text" id="tienda-nombre">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Link de tu catálogo (slug)</label>
+            <input type="text" id="tienda-slug">
+          </div>
+          <div class="field">
+            <label>WhatsApp (con código de país, sin +)</label>
+            <input type="text" id="tienda-whatsapp" placeholder="5491122334455">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-guardar-tienda" style="width:auto">Guardar cambios</button>
+        <hr class="stitch" style="margin:22px 0">
+        <p style="font-size:14px;color:var(--ink-soft);margin-bottom:8px">Tu catálogo público:</p>
+        <a id="link-catalogo" href="#" target="_blank" class="mono" style="color:var(--plum-600);word-break:break-all"></a>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modal-root"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
