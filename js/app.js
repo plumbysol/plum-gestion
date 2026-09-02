@@ -119,7 +119,7 @@ $('#form-registro').addEventListener('submit', async (e) => {
       return;
     }
     currentUser = data.user;
-    await new Promise((r) => setTimeout(r, 700));
+    await new Promise((r) => setTimeout(r, 700)); // deja tiempo al trigger que crea el perfil
     if (negocio) await db.from('profiles').update({ nombre_negocio: negocio }).eq('id', currentUser.id);
     await cargarTodo();
     showScreen('app-shell');
@@ -245,11 +245,16 @@ $('#btn-nuevo-insumo').addEventListener('click', () => abrirModalInsumo(null));
 // ============================================================
 // PRODUCTOS
 // ============================================================
-function calcularCostoProducto(insumosUsados) {
+function calcularCostoInsumos(insumosUsados) {
   return (insumosUsados || []).reduce((acc, u) => {
     const ins = insumos.find((i) => i.id === u.insumo_id);
     return acc + (ins ? Number(ins.costo_unitario) * Number(u.cantidad) : 0);
   }, 0);
+}
+function calcularCostoProducto(insumosUsados, horas) {
+  const costoInsumos = calcularCostoInsumos(insumosUsados);
+  const costoHoras = (Number(horas) || 0) * (Number(profile?.valor_hora) || 0);
+  return costoInsumos + costoHoras;
 }
 
 function filaInsumoUsadoHtml(item = { insumo_id: '', cantidad: 1 }) {
@@ -270,7 +275,7 @@ function renderProductos() {
   $('#productos-vacio').classList.toggle('hidden', productos.length > 0);
   $('#tabla-productos').classList.toggle('hidden', productos.length === 0);
   productos.forEach((p) => {
-    const costo = calcularCostoProducto(p.insumos_usados);
+    const costo = calcularCostoProducto(p.insumos_usados, p.horas);
     const ganancia = Number(p.precio) - costo;
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -289,29 +294,58 @@ function renderProductos() {
   tbody.querySelectorAll('.btn-eliminar').forEach((b) => b.addEventListener('click', () => eliminarProducto(b.dataset.id)));
 }
 
+async function subirImagenesProducto(files) {
+  const urls = [];
+  for (const file of files) {
+    const path = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+    const { error } = await db.storage.from('productos-imagenes').upload(path, file);
+    if (!error) {
+      const { data } = db.storage.from('productos-imagenes').getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+  }
+  return urls;
+}
+
 function abrirModalProducto(producto) {
   const editando = !!producto;
+  let imagenesExistentes = editando && producto.imagenes ? [...producto.imagenes] : [];
+  let imagenesNuevas = []; // File objects pendientes de subir
+
   abrirModal(`
     <h3>${editando ? 'Editar' : 'Nuevo'} producto</h3>
     <form id="form-producto">
       <div class="field"><label>Nombre</label><input type="text" id="prod-nombre" required value="${editando ? escapeHtml(producto.nombre) : ''}"></div>
       <div class="field"><label>Descripción</label><textarea id="prod-desc">${editando ? escapeHtml(producto.descripcion || '') : ''}</textarea></div>
-      <div class="field"><label>URL de imagen (opcional)</label><input type="text" id="prod-imagen" value="${editando ? escapeHtml(producto.imagen_url || '') : ''}"></div>
+      <div class="row2">
+        <div class="field"><label>Código (opcional)</label><input type="text" id="prod-codigo" value="${editando ? escapeHtml(producto.codigo || '') : ''}"></div>
+        <div class="field"><label>Unidades disponibles</label><input type="number" step="1" min="0" id="prod-unidades" value="${editando ? producto.unidades_disponibles : 0}"></div>
+      </div>
 
-      <label style="display:block;font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:8px">Insumos utilizados</label>
+      <label style="display:block;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:8px">Insumos utilizados</label>
       <div id="filas-insumos"></div>
       <button type="button" class="btn btn-outline btn-sm" id="btn-agregar-fila" style="margin-bottom:16px">+ Agregar insumo</button>
 
       <div class="row2">
-        <div class="field"><label>Costo calculado</label><input type="text" id="prod-costo-calc" class="num" disabled value="$0.00"></div>
-        <div class="field"><label>Precio de venta</label><input type="number" step="0.01" min="0" id="prod-precio" required value="${editando ? producto.precio : ''}"></div>
+        <div class="field"><label>Horas de trabajo</label><input type="number" step="0.1" min="0" id="prod-horas" value="${editando ? producto.horas : 0}"></div>
+        <div class="field"><label>Margen de ganancia %</label><input type="number" step="1" min="0" id="prod-margen" value="${editando ? producto.margen_ganancia : 80}"></div>
       </div>
+      <div class="row2">
+        <div class="field"><label>Costo total (insumos + horas)</label><input type="text" id="prod-costo-calc" class="num" disabled value="$0.00"></div>
+        <div class="field"><label>Precio sugerido</label><input type="text" id="prod-sugerido-calc" class="num" disabled value="$0.00"></div>
+      </div>
+      <div class="field"><label>Precio de venta (el que se muestra en el catálogo)</label><input type="number" step="0.01" min="0" id="prod-precio" required value="${editando ? producto.precio : ''}"></div>
+
+      <label style="display:block;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:8px">Fotos (hasta 5)</label>
+      <div id="imagenes-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px"></div>
+      <input type="file" id="prod-imagenes-input" accept="image/*" multiple style="margin-bottom:16px">
+
       <div class="field" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="prod-publico" style="width:auto" ${editando && producto.publico ? 'checked' : ''}>
         <label style="margin:0;text-transform:none;font-weight:500;font-size:14px;letter-spacing:0">Mostrar en mi catálogo público</label>
       </div>
       <div class="modal-actions">
-        <button type="submit" class="btn btn-primary">${editando ? 'Guardar cambios' : 'Crear producto'}</button>
+        <button type="submit" class="btn btn-primary" id="btn-guardar-producto">${editando ? 'Guardar cambios' : 'Crear producto'}</button>
         <button type="button" class="btn btn-outline" id="btn-cancelar-modal">Cancelar</button>
       </div>
     </form>
@@ -333,29 +367,88 @@ function abrirModalProducto(producto) {
       insumo_id: f.querySelector('.select-insumo').value,
       cantidad: parseFloat(f.querySelector('.input-cantidad').value) || 0,
     })).filter((u) => u.insumo_id);
-    $('#prod-costo-calc').value = '$' + calcularCostoProducto(usados).toFixed(2);
+    const horas = parseFloat($('#prod-horas').value) || 0;
+    const margen = parseFloat($('#prod-margen').value) || 0;
+    const costo = calcularCostoProducto(usados, horas);
+    $('#prod-costo-calc').value = '$' + costo.toFixed(2);
+    $('#prod-sugerido-calc').value = '$' + (costo * (1 + margen / 100)).toFixed(2);
   }
 
   (editando && producto.insumos_usados ? producto.insumos_usados : []).forEach(agregarFila);
+  $('#btn-agregar-fila').addEventListener('click', () => agregarFila());
+  $('#prod-horas').addEventListener('input', actualizarCostoCalc);
+  $('#prod-margen').addEventListener('input', actualizarCostoCalc);
   actualizarCostoCalc();
 
-  $('#btn-agregar-fila').addEventListener('click', () => agregarFila());
+  // ---- Manejo de fotos ----
+  function renderPreviews() {
+    const cont = $('#imagenes-preview');
+    cont.innerHTML = '';
+    const totalActual = imagenesExistentes.length + imagenesNuevas.length;
+    imagenesExistentes.forEach((url, idx) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'position:relative;width:72px;height:72px';
+      div.innerHTML = `<img src="${escapeHtml(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;border:2px solid var(--line)">
+        <button type="button" class="icon-btn" data-tipo="existente" data-idx="${idx}" style="position:absolute;top:-8px;right:-8px;background:var(--paper);border:2px solid var(--line);border-radius:50%;width:22px;height:22px;line-height:1;font-size:12px">✕</button>`;
+      cont.appendChild(div);
+    });
+    imagenesNuevas.forEach((file, idx) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'position:relative;width:72px;height:72px';
+      const url = URL.createObjectURL(file);
+      div.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;border:2px solid var(--line)">
+        <button type="button" class="icon-btn" data-tipo="nueva" data-idx="${idx}" style="position:absolute;top:-8px;right:-8px;background:var(--paper);border:2px solid var(--line);border-radius:50%;width:22px;height:22px;line-height:1;font-size:12px">✕</button>`;
+      cont.appendChild(div);
+    });
+    cont.querySelectorAll('button[data-tipo]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        if (btn.dataset.tipo === 'existente') imagenesExistentes.splice(idx, 1);
+        else imagenesNuevas.splice(idx, 1);
+        renderPreviews();
+      });
+    });
+    $('#prod-imagenes-input').disabled = totalActual >= 5;
+  }
+  renderPreviews();
+
+  $('#prod-imagenes-input').addEventListener('change', (e) => {
+    const disponibles = 5 - (imagenesExistentes.length + imagenesNuevas.length);
+    const nuevos = Array.from(e.target.files).slice(0, Math.max(0, disponibles));
+    if (Array.from(e.target.files).length > disponibles) alert('Máximo 5 fotos por producto. Se agregaron solo las primeras ' + disponibles + '.');
+    imagenesNuevas = imagenesNuevas.concat(nuevos);
+    e.target.value = '';
+    renderPreviews();
+  });
+
   $('#btn-cancelar-modal').addEventListener('click', cerrarModal);
 
   $('#form-producto').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const btnGuardar = $('#btn-guardar-producto');
+    btnGuardar.disabled = true;
+    const textoOriginal = btnGuardar.textContent;
+    btnGuardar.textContent = imagenesNuevas.length ? 'Subiendo fotos…' : 'Guardando…';
+
     const filas = [...filasCont.querySelectorAll('.fila-insumo-usado')];
     const insumos_usados = filas.map((f) => ({
       insumo_id: f.querySelector('.select-insumo').value,
       cantidad: parseFloat(f.querySelector('.input-cantidad').value) || 0,
     })).filter((u) => u.insumo_id);
 
+    const urlsNuevas = imagenesNuevas.length ? await subirImagenesProducto(imagenesNuevas) : [];
+    const imagenesFinal = imagenesExistentes.concat(urlsNuevas).slice(0, 5);
+
     const payload = {
       nombre: $('#prod-nombre').value.trim(),
       descripcion: $('#prod-desc').value.trim(),
-      imagen_url: $('#prod-imagen').value.trim(),
+      codigo: $('#prod-codigo').value.trim(),
+      unidades_disponibles: parseFloat($('#prod-unidades').value) || 0,
       precio: parseFloat($('#prod-precio').value) || 0,
+      horas: parseFloat($('#prod-horas').value) || 0,
+      margen_ganancia: parseFloat($('#prod-margen').value) || 0,
       insumos_usados,
+      imagenes: imagenesFinal,
       publico: $('#prod-publico').checked,
     };
     if (editando) await db.from('productos').update(payload).eq('id', producto.id);
@@ -522,6 +615,7 @@ function renderTienda() {
   $('#tienda-nombre').value = profile.nombre_negocio || '';
   $('#tienda-slug').value = profile.slug || '';
   $('#tienda-whatsapp').value = profile.whatsapp || '';
+  $('#tienda-valor-hora').value = profile.valor_hora || 0;
   actualizarLinkCatalogo();
 }
 function actualizarLinkCatalogo() {
@@ -537,6 +631,7 @@ $('#btn-guardar-tienda').addEventListener('click', async () => {
     nombre_negocio: $('#tienda-nombre').value.trim(),
     slug: $('#tienda-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
     whatsapp: $('#tienda-whatsapp').value.trim(),
+    valor_hora: parseFloat($('#tienda-valor-hora').value) || 0,
   };
   const btn = $('#btn-guardar-tienda');
   btn.disabled = true; const original = btn.textContent; btn.textContent = 'Guardando…';
