@@ -39,24 +39,45 @@ async function cargarCatalogo() {
       grid.innerHTML = `<p style="color:rgba(247,241,228,.7);text-align:center;grid-column:1/-1">
         Todavía no hay productos publicados.</p>`;
     } else {
-      grid.innerHTML = productos.map((p) => {
-        const img = p.imagen_url
-          ? `<img class="kraft-img" src="${escapeHtml(p.imagen_url)}" alt="${escapeHtml(p.nombre)}">`
+      grid.innerHTML = productos.map((p, prodIdx) => {
+        const fotos = (p.imagenes && p.imagenes.length) ? p.imagenes : [];
+        const imgPrincipal = fotos.length
+          ? `<img class="kraft-img" id="img-principal-${prodIdx}" src="${escapeHtml(fotos[0])}" alt="${escapeHtml(p.nombre)}">`
           : `<div class="kraft-img"></div>`;
+        const miniaturas = fotos.length > 1
+          ? `<div class="kraft-thumbs">${fotos.map((url, i) => `<img src="${escapeHtml(url)}" class="kraft-thumb${i === 0 ? ' activa' : ''}" data-prod="${prodIdx}" data-idx="${i}">`).join('')}</div>`
+          : '';
+        const sinStock = Number(p.unidades_disponibles) <= 0;
+        const stockTxt = sinStock
+          ? `<span class="tag" style="background:#fde0e4;color:#c4485f;margin-bottom:8px">Sin stock</span>`
+          : `<span class="tag tag-listo" style="margin-bottom:8px">Quedan ${Number(p.unidades_disponibles)}</span>`;
         const waBtn = perfil.whatsapp
-          ? `<a class="kraft-wa" target="_blank" href="https://wa.me/${escapeHtml(perfil.whatsapp)}?text=${encodeURIComponent('Hola! Quiero consultar por: ' + p.nombre)}">Pedir por WhatsApp</a>`
+          ? `<a class="kraft-wa" target="_blank" href="https://wa.me/${escapeHtml(perfil.whatsapp)}?text=${encodeURIComponent('Hola! Quiero consultar por: ' + p.nombre + (p.codigo ? ' (cod. ' + p.codigo + ')' : ''))}">Pedir por WhatsApp</a>`
           : '';
         return `
           <div class="kraft-tag">
-            ${img}
+            ${imgPrincipal}
+            ${miniaturas}
             <div class="kraft-body">
+              ${p.codigo ? `<p class="kraft-desc" style="padding-left:20px;margin-bottom:4px">Cód. ${escapeHtml(p.codigo)}</p>` : ''}
               <h3>${escapeHtml(p.nombre)}</h3>
               ${p.descripcion ? `<p class="kraft-desc">${escapeHtml(p.descripcion)}</p>` : ''}
+              <div style="padding-left:20px">${stockTxt}</div>
               <div class="kraft-price">$${Number(p.precio).toFixed(2)}</div>
               ${waBtn}
             </div>
           </div>`;
       }).join('');
+
+      grid.querySelectorAll('.kraft-thumb').forEach((thumb) => {
+        thumb.addEventListener('click', () => {
+          const prodIdx = thumb.dataset.prod;
+          const url = thumb.getAttribute('src');
+          document.getElementById('img-principal-' + prodIdx).src = url;
+          thumb.parentElement.querySelectorAll('.kraft-thumb').forEach((t) => t.classList.remove('activa'));
+          thumb.classList.add('activa');
+        });
+      });
     }
 
     document.getElementById('pantalla-cargando').classList.add('hidden');
