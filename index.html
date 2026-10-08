@@ -153,11 +153,17 @@
             <input type="text" id="tienda-whatsapp" placeholder="5491122334455">
           </div>
         </div>
-        <div class="field" style="max-width:260px">
-          <label>Valor de tu hora de trabajo</label>
-          <input type="number" step="0.01" min="0" id="tienda-valor-hora" placeholder="0">
-          <p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;font-weight:500">Se usa para calcular el costo de tu mano de obra en cada producto.</p>
+        <div class="row2">
+          <div class="field">
+            <label>Valor de tu hora de trabajo</label>
+            <input type="number" step="0.01" min="0" id="tienda-valor-hora" placeholder="0">
+          </div>
+          <div class="field">
+            <label>Link de Mercado Pago</label>
+            <input type="text" id="tienda-mercadopago" placeholder="https://mpago.la/...">
+          </div>
         </div>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin-top:-10px;margin-bottom:16px;font-weight:500">El valor de la hora se usa para calcular costos internos. El link de Mercado Pago aparece como botón de pago en el catálogo.</p>
         <button class="btn btn-primary" id="btn-guardar-tienda" style="width:auto">Guardar cambios</button>
         <hr class="stitch" style="margin:22px 0">
         <p style="font-size:14px;color:var(--ink-soft);margin-bottom:8px">Tu catálogo público:</p>
