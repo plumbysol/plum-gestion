@@ -1,3 +1,4 @@
+```javascript
 // ============================================================
 // Plum Gestión — lógica de la aplicación
 // ============================================================
@@ -245,6 +246,9 @@ $('#btn-nuevo-insumo').addEventListener('click', () => abrirModalInsumo(null));
 // ============================================================
 // PRODUCTOS
 // ============================================================
+const CATEGORIAS_ARTESANAL = ['Packs', 'Amigurumis', 'Accesorios y Decoración', 'Impresos'];
+const CATEGORIAS_DIGITAL = ['Stickers', 'Ilustraciones', 'Plantillas', 'Recursos'];
+
 function calcularCostoInsumos(insumosUsados) {
   return (insumosUsados || []).reduce((acc, u) => {
     const ins = insumos.find((i) => i.id === u.insumo_id);
@@ -279,7 +283,7 @@ function renderProductos() {
     const ganancia = Number(p.precio) - costo;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${escapeHtml(p.nombre)}</td>
+      <td>${escapeHtml(p.nombre)}<br><span style="font-size:11.5px;color:var(--ink-soft)">${p.tipo === 'digital' ? 'Digital' : 'Artesanal'}${p.categoria ? ' · ' + escapeHtml(p.categoria) : ''}</span></td>
       <td class="num">$${costo.toFixed(2)}</td>
       <td class="num">$${Number(p.precio).toFixed(2)}</td>
       <td class="num" style="color:${ganancia >= 0 ? 'var(--sage)' : 'var(--danger)'}">$${ganancia.toFixed(2)}</td>
@@ -311,12 +315,27 @@ function abrirModalProducto(producto) {
   const editando = !!producto;
   let imagenesExistentes = editando && producto.imagenes ? [...producto.imagenes] : [];
   let imagenesNuevas = []; // File objects pendientes de subir
+  const tipoActual = editando ? (producto.tipo || 'artesanal') : 'artesanal';
+
+  const opcionesCategoria = (tipo) => (tipo === 'digital' ? CATEGORIAS_DIGITAL : CATEGORIAS_ARTESANAL)
+    .map((c) => `<option value="${c}">${c}</option>`).join('');
 
   abrirModal(`
     <h3>${editando ? 'Editar' : 'Nuevo'} producto</h3>
     <form id="form-producto">
       <div class="field"><label>Nombre</label><input type="text" id="prod-nombre" required value="${editando ? escapeHtml(producto.nombre) : ''}"></div>
       <div class="field"><label>Descripción</label><textarea id="prod-desc">${editando ? escapeHtml(producto.descripcion || '') : ''}</textarea></div>
+      <div class="row2">
+        <div class="field"><label>Tipo de producto</label>
+          <select id="prod-tipo">
+            <option value="artesanal" ${tipoActual === 'artesanal' ? 'selected' : ''}>Producto Artesanal</option>
+            <option value="digital" ${tipoActual === 'digital' ? 'selected' : ''}>Imprimible Digital</option>
+          </select>
+        </div>
+        <div class="field"><label>Categoría</label>
+          <select id="prod-categoria">${opcionesCategoria(tipoActual)}</select>
+        </div>
+      </div>
       <div class="row2">
         <div class="field"><label>Código (opcional)</label><input type="text" id="prod-codigo" value="${editando ? escapeHtml(producto.codigo || '') : ''}"></div>
         <div class="field"><label>Unidades disponibles</label><input type="number" step="1" min="0" id="prod-unidades" value="${editando ? producto.unidades_disponibles : 0}"></div>
@@ -350,6 +369,11 @@ function abrirModalProducto(producto) {
       </div>
     </form>
   `);
+
+  if (editando && producto.categoria) $('#prod-categoria').value = producto.categoria;
+  $('#prod-tipo').addEventListener('change', () => {
+    $('#prod-categoria').innerHTML = opcionesCategoria($('#prod-tipo').value);
+  });
 
   const filasCont = $('#filas-insumos');
   function agregarFila(item) {
@@ -386,262 +410,4 @@ function abrirModalProducto(producto) {
     cont.innerHTML = '';
     const totalActual = imagenesExistentes.length + imagenesNuevas.length;
     imagenesExistentes.forEach((url, idx) => {
-      const div = document.createElement('div');
-      div.style.cssText = 'position:relative;width:72px;height:72px';
-      div.innerHTML = `<img src="${escapeHtml(url)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;border:2px solid var(--line)">
-        <button type="button" class="icon-btn" data-tipo="existente" data-idx="${idx}" style="position:absolute;top:-8px;right:-8px;background:var(--paper);border:2px solid var(--line);border-radius:50%;width:22px;height:22px;line-height:1;font-size:12px">✕</button>`;
-      cont.appendChild(div);
-    });
-    imagenesNuevas.forEach((file, idx) => {
-      const div = document.createElement('div');
-      div.style.cssText = 'position:relative;width:72px;height:72px';
-      const url = URL.createObjectURL(file);
-      div.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;border:2px solid var(--line)">
-        <button type="button" class="icon-btn" data-tipo="nueva" data-idx="${idx}" style="position:absolute;top:-8px;right:-8px;background:var(--paper);border:2px solid var(--line);border-radius:50%;width:22px;height:22px;line-height:1;font-size:12px">✕</button>`;
-      cont.appendChild(div);
-    });
-    cont.querySelectorAll('button[data-tipo]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const idx = Number(btn.dataset.idx);
-        if (btn.dataset.tipo === 'existente') imagenesExistentes.splice(idx, 1);
-        else imagenesNuevas.splice(idx, 1);
-        renderPreviews();
-      });
-    });
-    $('#prod-imagenes-input').disabled = totalActual >= 5;
-  }
-  renderPreviews();
-
-  $('#prod-imagenes-input').addEventListener('change', (e) => {
-    const disponibles = 5 - (imagenesExistentes.length + imagenesNuevas.length);
-    const nuevos = Array.from(e.target.files).slice(0, Math.max(0, disponibles));
-    if (Array.from(e.target.files).length > disponibles) alert('Máximo 5 fotos por producto. Se agregaron solo las primeras ' + disponibles + '.');
-    imagenesNuevas = imagenesNuevas.concat(nuevos);
-    e.target.value = '';
-    renderPreviews();
-  });
-
-  $('#btn-cancelar-modal').addEventListener('click', cerrarModal);
-
-  $('#form-producto').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btnGuardar = $('#btn-guardar-producto');
-    btnGuardar.disabled = true;
-    const textoOriginal = btnGuardar.textContent;
-    btnGuardar.textContent = imagenesNuevas.length ? 'Subiendo fotos…' : 'Guardando…';
-
-    const filas = [...filasCont.querySelectorAll('.fila-insumo-usado')];
-    const insumos_usados = filas.map((f) => ({
-      insumo_id: f.querySelector('.select-insumo').value,
-      cantidad: parseFloat(f.querySelector('.input-cantidad').value) || 0,
-    })).filter((u) => u.insumo_id);
-
-    const urlsNuevas = imagenesNuevas.length ? await subirImagenesProducto(imagenesNuevas) : [];
-    const imagenesFinal = imagenesExistentes.concat(urlsNuevas).slice(0, 5);
-
-    const payload = {
-      nombre: $('#prod-nombre').value.trim(),
-      descripcion: $('#prod-desc').value.trim(),
-      codigo: $('#prod-codigo').value.trim(),
-      unidades_disponibles: parseFloat($('#prod-unidades').value) || 0,
-      precio: parseFloat($('#prod-precio').value) || 0,
-      horas: parseFloat($('#prod-horas').value) || 0,
-      margen_ganancia: parseFloat($('#prod-margen').value) || 0,
-      insumos_usados,
-      imagenes: imagenesFinal,
-      publico: $('#prod-publico').checked,
-    };
-    if (editando) await db.from('productos').update(payload).eq('id', producto.id);
-    else { payload.user_id = currentUser.id; await db.from('productos').insert(payload); }
-    cerrarModal();
-    await recargarProductos();
-  });
-}
-async function recargarProductos() {
-  const { data } = await db.from('productos').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-  productos = data || []; renderProductos();
-}
-async function eliminarProducto(id) {
-  if (!confirm('¿Eliminar este producto?')) return;
-  await db.from('productos').delete().eq('id', id);
-  await recargarProductos();
-}
-$('#btn-nuevo-producto').addEventListener('click', () => abrirModalProducto(null));
-
-// ============================================================
-// PEDIDOS
-// ============================================================
-const ESTADO_LABEL = { pendiente: 'Pendiente', en_proceso: 'En proceso', listo: 'Listo', entregado: 'Entregado', cancelado: 'Cancelado' };
-
-function renderPedidos() {
-  const tbody = $('#tabla-pedidos tbody');
-  tbody.innerHTML = '';
-  $('#pedidos-vacio').classList.toggle('hidden', pedidos.length > 0);
-  $('#tabla-pedidos').classList.toggle('hidden', pedidos.length === 0);
-  pedidos.forEach((p) => {
-    const fecha = new Date(p.created_at).toLocaleDateString('es-AR');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${escapeHtml(p.cliente_nombre)}</td>
-      <td class="num">$${Number(p.total).toFixed(2)}</td>
-      <td><span class="tag tag-${p.estado}">${ESTADO_LABEL[p.estado]}</span></td>
-      <td class="num">${fecha}</td>
-      <td class="toolbar">
-        <button class="icon-btn btn-editar" data-id="${p.id}">Editar</button>
-        <button class="icon-btn btn-eliminar" data-id="${p.id}">Eliminar</button>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-  tbody.querySelectorAll('.btn-editar').forEach((b) => b.addEventListener('click', () => abrirModalPedido(pedidos.find((x) => x.id === b.dataset.id))));
-  tbody.querySelectorAll('.btn-eliminar').forEach((b) => b.addEventListener('click', () => eliminarPedido(b.dataset.id)));
-}
-
-function filaItemPedidoHtml(item = { producto_id: '', cantidad: 1 }) {
-  const options = productos.map((p) => `<option value="${p.id}" data-precio="${p.precio}" ${p.id === item.producto_id ? 'selected' : ''}>${escapeHtml(p.nombre)} — $${Number(p.precio).toFixed(2)}</option>`).join('');
-  return `
-    <div class="fila-item-pedido" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-      <select class="select-producto" style="flex:2;padding:9px;border:1px solid var(--line);border-radius:8px">
-        ${options || '<option value="">— cargá productos primero —</option>'}
-      </select>
-      <input type="number" step="1" min="1" class="input-cantidad-item" value="${item.cantidad}" style="flex:1;padding:9px;border:1px solid var(--line);border-radius:8px">
-      <button type="button" class="icon-btn btn-quitar-fila">✕</button>
-    </div>`;
-}
-
-function abrirModalPedido(pedido) {
-  const editando = !!pedido;
-  abrirModal(`
-    <h3>${editando ? 'Editar' : 'Nuevo'} pedido</h3>
-    <form id="form-pedido">
-      <div class="row2">
-        <div class="field"><label>Cliente</label><input type="text" id="ped-cliente" required value="${editando ? escapeHtml(pedido.cliente_nombre) : ''}"></div>
-        <div class="field"><label>Contacto</label><input type="text" id="ped-contacto" value="${editando ? escapeHtml(pedido.cliente_contacto || '') : ''}"></div>
-      </div>
-      <label style="display:block;font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:8px">Productos pedidos</label>
-      <div id="filas-items"></div>
-      <button type="button" class="btn btn-outline btn-sm" id="btn-agregar-item" style="margin-bottom:16px">+ Agregar producto</button>
-      <div class="row2">
-        <div class="field"><label>Total</label><input type="text" id="ped-total-calc" class="num" disabled value="$0.00"></div>
-        <div class="field"><label>Estado</label>
-          <select id="ped-estado">
-            <option value="pendiente">Pendiente</option>
-            <option value="en_proceso">En proceso</option>
-            <option value="listo">Listo</option>
-            <option value="entregado">Entregado</option>
-            <option value="cancelado">Cancelado</option>
-          </select>
-        </div>
-      </div>
-      <div class="field"><label>Notas</label><textarea id="ped-notas">${editando ? escapeHtml(pedido.notas || '') : ''}</textarea></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-primary">${editando ? 'Guardar cambios' : 'Crear pedido'}</button>
-        <button type="button" class="btn btn-outline" id="btn-cancelar-modal">Cancelar</button>
-      </div>
-    </form>
-  `);
-  if (editando) $('#ped-estado').value = pedido.estado;
-
-  const filasCont = $('#filas-items');
-  function agregarFilaItem(item) {
-    const div = document.createElement('div');
-    div.innerHTML = filaItemPedidoHtml(item);
-    const fila = div.firstElementChild;
-    filasCont.appendChild(fila);
-    fila.querySelector('.btn-quitar-fila').addEventListener('click', () => { fila.remove(); actualizarTotalCalc(); });
-    fila.querySelector('.select-producto').addEventListener('change', actualizarTotalCalc);
-    fila.querySelector('.input-cantidad-item').addEventListener('input', actualizarTotalCalc);
-  }
-  function actualizarTotalCalc() {
-    const filas = [...filasCont.querySelectorAll('.fila-item-pedido')];
-    let total = 0;
-    filas.forEach((f) => {
-      const sel = f.querySelector('.select-producto');
-      const precio = parseFloat(sel.selectedOptions[0]?.dataset.precio || 0);
-      const cant = parseFloat(f.querySelector('.input-cantidad-item').value) || 0;
-      total += precio * cant;
-    });
-    $('#ped-total-calc').value = '$' + total.toFixed(2);
-  }
-
-  (editando && pedido.items ? pedido.items : []).forEach((it) => agregarFilaItem({ producto_id: it.producto_id, cantidad: it.cantidad }));
-  actualizarTotalCalc();
-
-  $('#btn-agregar-item').addEventListener('click', () => agregarFilaItem());
-  $('#btn-cancelar-modal').addEventListener('click', cerrarModal);
-
-  $('#form-pedido').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const filas = [...filasCont.querySelectorAll('.fila-item-pedido')];
-    let total = 0;
-    const items = filas.map((f) => {
-      const sel = f.querySelector('.select-producto');
-      const producto_id = sel.value;
-      const prodInfo = productos.find((p) => p.id === producto_id);
-      const cantidad = parseFloat(f.querySelector('.input-cantidad-item').value) || 0;
-      const precio_unit = prodInfo ? Number(prodInfo.precio) : 0;
-      total += precio_unit * cantidad;
-      return { producto_id, nombre: prodInfo ? prodInfo.nombre : '', cantidad, precio_unit };
-    }).filter((it) => it.producto_id);
-
-    const payload = {
-      cliente_nombre: $('#ped-cliente').value.trim(),
-      cliente_contacto: $('#ped-contacto').value.trim(),
-      items, total,
-      estado: $('#ped-estado').value,
-      notas: $('#ped-notas').value.trim(),
-    };
-    if (editando) await db.from('pedidos').update(payload).eq('id', pedido.id);
-    else { payload.user_id = currentUser.id; await db.from('pedidos').insert(payload); }
-    cerrarModal();
-    await recargarPedidos();
-  });
-}
-async function recargarPedidos() {
-  const { data } = await db.from('pedidos').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-  pedidos = data || []; renderPedidos();
-}
-async function eliminarPedido(id) {
-  if (!confirm('¿Eliminar este pedido?')) return;
-  await db.from('pedidos').delete().eq('id', id);
-  await recargarPedidos();
-}
-$('#btn-nuevo-pedido').addEventListener('click', () => abrirModalPedido(null));
-
-// ============================================================
-// MI TIENDA
-// ============================================================
-function renderTienda() {
-  if (!profile) return;
-  $('#tienda-nombre').value = profile.nombre_negocio || '';
-  $('#tienda-slug').value = profile.slug || '';
-  $('#tienda-whatsapp').value = profile.whatsapp || '';
-  $('#tienda-valor-hora').value = profile.valor_hora || 0;
-  actualizarLinkCatalogo();
-}
-function actualizarLinkCatalogo() {
-  const url = new URL('catalogo.html', window.location.href);
-  url.searchParams.set('tienda', $('#tienda-slug').value || profile.slug);
-  $('#link-catalogo').href = url.toString();
-  $('#link-catalogo').textContent = url.toString();
-}
-$('#tienda-slug').addEventListener('input', actualizarLinkCatalogo);
-
-$('#btn-guardar-tienda').addEventListener('click', async () => {
-  const payload = {
-    nombre_negocio: $('#tienda-nombre').value.trim(),
-    slug: $('#tienda-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-    whatsapp: $('#tienda-whatsapp').value.trim(),
-    valor_hora: parseFloat($('#tienda-valor-hora').value) || 0,
-  };
-  const btn = $('#btn-guardar-tienda');
-  btn.disabled = true; const original = btn.textContent; btn.textContent = 'Guardando…';
-  const { error } = await db.from('profiles').update(payload).eq('id', currentUser.id);
-  btn.disabled = false; btn.textContent = original;
-  if (error) { alert('No se pudo guardar: ' + (error.message.includes('duplicate') ? 'ese link ya está en uso, probá otro.' : error.message)); return; }
-  profile = { ...profile, ...payload };
-  actualizarLinkCatalogo();
-  alert('Guardado ✓');
-});
-
-// ============================================================
-init();
+      const div = document.createElement(
